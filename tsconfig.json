@@ -37,10 +37,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     /* Route alias */
-    "baseUrl": ".",
-    "paths": {
-      "~/*": ["src/*"],
-    }
+    "baseUrl": "."
   },
   "includes": [
     "src"

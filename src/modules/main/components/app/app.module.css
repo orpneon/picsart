@@ -1,0 +1,30 @@
+.container {
+    padding: 16px 24px;
+}
+
+.color-picker {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    box-sizing: content-box;
+}
+
+.color-picker.active {
+    background-color: #ccc;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.canvas.active {
+    cursor: crosshair;
+}
