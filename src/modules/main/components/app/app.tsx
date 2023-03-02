@@ -30,10 +30,6 @@ export const App: FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
-  const toggleActive = useCallback(() => {
-    setActive((active) => !active);
-  }, []);
-
   const getCanvasContext = useCallback(() => {
     const canvasCtx = canvasRef.current?.getContext('2d');
 
@@ -54,6 +50,18 @@ export const App: FC = () => {
     return image;
   }, []);
 
+  const clearImage = useCallback(() => {
+    const canvasCtx = getCanvasContext();
+    const image = getImage();
+
+    canvasCtx.drawImage(image, 0, 0);
+  }, [getCanvasContext, getImage]);
+
+  const toggleActive = useCallback(() => {
+    setActive((active) => !active);
+    clearImage();
+  }, [clearImage]);
+
   const changeCurrentColor = useCallback<MouseEventHandler<HTMLCanvasElement>>(
     ({ nativeEvent }) => {
       if (!active) {
@@ -69,9 +77,10 @@ export const App: FC = () => {
 
       setCurrentColor(currentColor);
 
+      canvasCtx.drawImage(image, 0, 0);
       canvasCtx.save();
 
-      canvasCtx.save();
+      // draw the magnified part of image clipped in a circle
       canvasCtx.beginPath();
       canvasCtx.arc(offsetX, offsetY, MAGNIFIER_RADIUS, 0, 2 * Math.PI);
       canvasCtx.closePath();
@@ -87,8 +96,9 @@ export const App: FC = () => {
         MAGNIFIER_SIZE,
         MAGNIFIER_SIZE
       );
-      canvasCtx.restore();
 
+      // draw the frame
+      canvasCtx.save();
       canvasCtx.beginPath();
       canvasCtx.arc(offsetX, offsetY, MAGNIFIER_RADIUS, 0, 2 * Math.PI);
       canvasCtx.strokeStyle = currentColor;
@@ -99,6 +109,7 @@ export const App: FC = () => {
       canvasCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
       canvasCtx.stroke();
 
+      // draw a current color text
       canvasCtx.beginPath();
       const textWidth = canvasCtx.measureText(currentColor).width;
       canvasCtx.fillStyle = 'white';
@@ -110,6 +121,8 @@ export const App: FC = () => {
         [5]
       );
       canvasCtx.fill();
+      // rollback shadow and stroke settings
+      canvasCtx.restore();
       canvasCtx.font = '12px Arial';
       canvasCtx.fillStyle = 'Black';
       canvasCtx.fillText(
@@ -136,7 +149,8 @@ export const App: FC = () => {
 
     setSelectedColor(currentColor);
     setActive(false);
-  }, [active, currentColor]);
+    clearImage();
+  }, [active, clearImage, currentColor]);
 
   useEffect(() => {
     const image = new Image();
@@ -180,7 +194,6 @@ export const App: FC = () => {
           </div>
 
           <SelectedColor active={active} selectedColor={selectedColor} />
-          <SelectedColor active={active} selectedColor={currentColor} />
         </div>
 
         <canvas
