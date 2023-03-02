@@ -7,9 +7,17 @@ import {
   useState,
 } from 'react';
 import classNames from 'classnames';
+import { useDebouncedCallback } from 'use-debounce';
 import { ReactComponent as IconColorPicker } from 'src/modules/main/assets/IconColorPicker.svg';
 import pictureSrc from 'src/modules/main/assets/FHD_Picture.jpg';
-import { MAX_CANVAS_SIZE } from 'src/modules/main/constants';
+import {
+  MAX_CANVAS_SIZE,
+  MAGNIFIER_ZOOM,
+  MAGNIFIER_RADIUS,
+  MAGNIFIER_BORDER_WIDTH,
+  FRAME_DURATION,
+  MAGNIFIER_SIZE,
+} from 'src/modules/main/constants';
 import { rgbToHex } from 'src/helpers/converters';
 import { SelectedColor } from 'src/modules/main/components/selected-color';
 
@@ -18,15 +26,12 @@ import styles from './app.module.css';
 export const App: FC = () => {
   const [active, setActive] = useState(false);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [currentColor, setCurrentColor] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
 
   const toggleActive = useCallback(() => {
     setActive((active) => !active);
-  }, []);
-
-  const selectColor = useCallback((value: string) => {
-    setSelectedColor(value);
-    setActive(false);
   }, []);
 
   const getCanvasContext = useCallback(() => {
@@ -39,27 +44,106 @@ export const App: FC = () => {
     return canvasCtx;
   }, []);
 
-  const chooseColor = useCallback<MouseEventHandler<HTMLCanvasElement>>(
+  const getImage = useCallback(() => {
+    const image = imageRef.current;
+
+    if (!image) {
+      throw new Error('An error has occurred while getting loaded image');
+    }
+
+    return image;
+  }, []);
+
+  const changeCurrentColor = useCallback<MouseEventHandler<HTMLCanvasElement>>(
     ({ nativeEvent }) => {
       if (!active) {
         return;
       }
 
       const canvasCtx = getCanvasContext();
+      const image = getImage();
       const { offsetX, offsetY } = nativeEvent;
       const { data } = canvasCtx.getImageData(offsetX, offsetY, 1, 1);
       const [r, g, b] = data;
+      const currentColor = `#${rgbToHex(r, g, b)}`.toUpperCase();
 
-      selectColor(`#${rgbToHex(r, g, b)}`);
+      setCurrentColor(currentColor);
+
+      canvasCtx.save();
+
+      canvasCtx.save();
+      canvasCtx.beginPath();
+      canvasCtx.arc(offsetX, offsetY, MAGNIFIER_RADIUS, 0, 2 * Math.PI);
+      canvasCtx.closePath();
+      canvasCtx.clip();
+      canvasCtx.drawImage(
+        image,
+        offsetX - MAGNIFIER_RADIUS / MAGNIFIER_ZOOM,
+        offsetY - MAGNIFIER_RADIUS / MAGNIFIER_ZOOM,
+        MAGNIFIER_SIZE / MAGNIFIER_ZOOM,
+        MAGNIFIER_SIZE / MAGNIFIER_ZOOM,
+        offsetX - MAGNIFIER_RADIUS,
+        offsetY - MAGNIFIER_RADIUS,
+        MAGNIFIER_SIZE,
+        MAGNIFIER_SIZE
+      );
+      canvasCtx.restore();
+
+      canvasCtx.beginPath();
+      canvasCtx.arc(offsetX, offsetY, MAGNIFIER_RADIUS, 0, 2 * Math.PI);
+      canvasCtx.strokeStyle = currentColor;
+      canvasCtx.lineWidth = MAGNIFIER_BORDER_WIDTH;
+      canvasCtx.shadowOffsetX = 0;
+      canvasCtx.shadowOffsetY = 0;
+      canvasCtx.shadowBlur = 4;
+      canvasCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      canvasCtx.stroke();
+
+      canvasCtx.beginPath();
+      const textWidth = canvasCtx.measureText(currentColor).width;
+      canvasCtx.fillStyle = 'white';
+      canvasCtx.roundRect(
+        offsetX - textWidth / 2 - 10,
+        offsetY + MAGNIFIER_RADIUS / 2 - 14,
+        textWidth + 20,
+        20,
+        [5]
+      );
+      canvasCtx.fill();
+      canvasCtx.font = '12px Arial';
+      canvasCtx.fillStyle = 'Black';
+      canvasCtx.fillText(
+        currentColor,
+        offsetX - textWidth / 2 - 4,
+        offsetY + MAGNIFIER_RADIUS / 2
+      );
+      canvasCtx.clip();
+
+      canvasCtx.restore();
     },
-    [active, getCanvasContext, selectColor]
+    [active, getCanvasContext, getImage]
   );
+
+  const debouncedChangeCurrentColor = useDebouncedCallback(
+    changeCurrentColor,
+    FRAME_DURATION
+  );
+
+  const selectColor = useCallback<MouseEventHandler<HTMLCanvasElement>>(() => {
+    if (!active) {
+      return;
+    }
+
+    setSelectedColor(currentColor);
+    setActive(false);
+  }, [active, currentColor]);
 
   useEffect(() => {
     const image = new Image();
 
     image.src = pictureSrc;
     image.onload = () => {
+      imageRef.current = image;
       const { width, height } = image;
 
       if (!width || !height) {
@@ -96,6 +180,7 @@ export const App: FC = () => {
           </div>
 
           <SelectedColor active={active} selectedColor={selectedColor} />
+          <SelectedColor active={active} selectedColor={currentColor} />
         </div>
 
         <canvas
@@ -103,7 +188,8 @@ export const App: FC = () => {
             [styles.active]: active,
           })}
           ref={canvasRef}
-          onClick={chooseColor}
+          onClick={selectColor}
+          onMouseMove={debouncedChangeCurrentColor}
         />
       </main>
     </div>
